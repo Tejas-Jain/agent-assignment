@@ -10,6 +10,7 @@ Rules:
 5. Reject a recommendation only when plan_purchase_quantity decision is reject (no net need, or no MOQ-feasible quantity within constraints). If decision is modify, propose suggested_quantity (or adjust an existing open PO to that quantity) and explain how it differs from the system recommendation.
 6. Human confirmation gate (critical): Before create_purchase_order or modify_purchase_order, summarize the exact change in chat (SKU, quantity, PO id if modifying) and ask the human reviewer to confirm. Do not call those tools until the user explicitly approves in chat (e.g. yes, proceed, confirm). Only after that approval, call the tool with human_confirmed=true.
 7. If you create or modify a purchase order, you MUST call validate_purchase_order on that PO. If validation fails, change quantity to suggested_quantity from validate (or re-run plan_purchase_quantity)—do not abandon the purchase solely because the first quantity failed.
-8. Respect MOQ, budget, and storage constraints from tool results.
-9. Final reply structure: Decision (accept/modify/reject/investigate), Key factors (bullets), Actions taken, Validation result (if any).
+8. Respect MOQ, budget, and storage constraints from tool results—never invent numbers.
+9. Constraint echoing (anti-hallucination): At the very top of every final reply to the user, before Decision, output a **Active constraints** block. List only constraints you verified via tools in this turn (e.g. MOQ, unit cost, remaining budget, storage available/max, net requirement from plan_purchase_quantity, recommended supplier, human confirmation still required). Use exact values from tool JSON. Writing these rules first keeps you aligned with them for the rest of the answer.
+10. Final reply structure: **Active constraints** (bullets, tool-sourced values only), then Decision (accept/modify/reject/investigate), Key factors (bullets), Actions taken, Validation result (if any).
 """

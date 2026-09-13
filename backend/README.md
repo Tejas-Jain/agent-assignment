@@ -1,19 +1,20 @@
 # AI Purchasing Agent — Backend
 
-FastAPI buyer agent with a chat interface. Streams over SSE to the optional Vite frontend.
+FastAPI service: chat API, Gemini tool loop, JSON buyer store.
 
 ## Setup
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/Scripts/activate   # Windows Git Bash
+source .venv/bin/activate          # Linux/macOS
+# source .venv/Scripts/activate    # Windows
 pip install -r requirements.txt
 cp .env.example .env
 # Set GEMINI_API_KEY in .env
 ```
 
-On first run, if [`app/data/buyers.json`](app/data/buyers.json) is missing it is copied from [`app/data/seed/buyers.json`](app/data/seed/buyers.json).
+If [`app/data/buyers.json`](app/data/buyers.json) is missing, it is copied from [`app/data/seed/buyers.json`](app/data/seed/buyers.json).
 
 ## Run
 
@@ -21,32 +22,40 @@ On first run, if [`app/data/buyers.json`](app/data/buyers.json) is missing it is
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Frontend (optional demo UI): `cd frontend && npm run dev` — proxies `/api` to `:8000`.
+Frontend: `cd ../frontend && npm install && npm run dev` (proxies `/api` to `:8000`).
 
-## What to read first
+## Code map
 
-1. [`app/agent/prompts.py`](app/agent/prompts.py) — agent rules (scenario text comes from chat)  
-2. [`app/agent/runner.py`](app/agent/runner.py) — tool loop, then one final reply over SSE  
-3. [`app/tools/registry.py`](app/tools/registry.py) — tool definitions and dispatch  
-4. [`app/tools/store.py`](app/tools/store.py) — load/persist live [`app/data/buyers.json`](app/data/buyers.json); seed in [`app/data/seed/buyers.json`](app/data/seed/buyers.json)  
-5. [`app/tools/read.py`](app/tools/read.py) / [`app/tools/actions.py`](app/tools/actions.py) — read tools and PO actions  
+| File | Role |
+|------|------|
+| [`app/agent/prompts.py`](app/agent/prompts.py) | System prompt |
+| [`app/agent/runner.py`](app/agent/runner.py) | Gemini tool loop, SSE reply |
+| [`app/agent/llm/gemini_client.py`](app/agent/llm/gemini_client.py) | Gemini API |
+| [`app/tools/registry.py`](app/tools/registry.py) | Tool schemas and dispatch |
+| [`app/tools/read.py`](app/tools/read.py) | Read ERP data |
+| [`app/tools/actions.py`](app/tools/actions.py) | PO create/modify/validate, planning |
+| [`app/tools/store.py`](app/tools/store.py) | Load/save `buyers.json` |
+| [`app/api/chat.py`](app/api/chat.py) | `POST /api/chat` |
+| [`app/api/conversations.py`](app/api/conversations.py) | Saved chats |
 
-## Data model
+## Data
 
-- **Seed:** `app/data/seed/buyers.json` (git tracked, initial ERP snapshot).  
-- **Live:** `app/data/buyers.json` (gitignored; PO creates/edits persist here). Reset manually by copying from `app/data/seed/buyers.json`.
-- **No session overlay** — one shared world for the app process.
-- **Recommendations** come from the **user chat message** only, not from the JSON store.
+- **Seed:** `app/data/seed/buyers.json` (initial state, in git)
+- **Live:** `app/data/buyers.json` (PO writes persist here; gitignored)
+- Reset: copy seed over live file
+- Purchase **recommendations** come from the user message in chat, not from JSON
 
-Default buyer for tools: `BUYER-01`.
+`app/tools/store.py` loads and saves the live file; `read.py` and `actions.py` are the tool wrappers that read/write through the store (see root [README](../README.md) — *Mocking external services and databases*).
+
+Default buyer id for tools: `BUYER-01`.
 
 ## Environment
 
 | Variable | Purpose |
 |----------|---------|
 | `GEMINI_API_KEY` | Required |
-| `GEMINI_MODEL` | Default `gemini-2.0-flash` |
-| `MAX_TOOL_ITERATIONS` | Cap on tool rounds before error reply (default `10`) |
+| `GEMINI_MODEL` | Default `gemini-3.5-flash-lite` |
+| `MAX_TOOL_ITERATIONS` | Tool rounds before stop (default `10`) |
 
 ## Tests
 
@@ -54,22 +63,11 @@ Default buyer for tools: `BUYER-01`.
 pytest
 ```
 
-Tests use a temp `buyers.json` copied from seed (see [`tests/conftest.py`](tests/conftest.py)).
+See [`tests/conftest.py`](tests/conftest.py) for isolated buyer data.
 
-## Architecture
+## HTTP API
 
-```mermaid
-flowchart LR
-  ChatAPI["POST /api/chat"] --> Runner[stream_agent_sse]
-  Runner --> Gemini[GeminiProvider.generate]
-  Runner --> Tools[tools]
-  Tools --> Live[buyers.json]
-  Seed[seed/buyers.json] --> Live
-```
+- OpenAPI spec: [`openapi.yaml`](openapi.yaml)
+- Example requests: [`api-collection/`](api-collection/)
 
-Past chats: **New chat** → `POST /api/conversations` (transcript only). List/get: `GET /api/conversations`, `GET /api/conversations/{id}`.
-
-## API docs
-
-- Bruno: [`api-collection/`](api-collection/) (`baseUrl` → `:8000`)
-- OpenAPI: [`openapi.yaml`](openapi.yaml)
+Past chats: **New chat** → `POST /api/conversations`. List/get: `GET /api/conversations`, `GET /api/conversations/{id}`. Saved files live in `app/data/conversations/` (see root README — *Test scenarios and evaluation approach*).
