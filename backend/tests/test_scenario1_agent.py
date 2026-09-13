@@ -32,6 +32,14 @@ def test_read_inventory_and_demand_for_sku():
     assert demand["expected_units"] == 1000
 
 
+def test_list_suppliers_for_sku():
+    store.reset_from_seed()
+    result = json.loads(registry.execute_tool("get_supplier_terms", {"sku": "PROD-001"}))
+    assert result["sku"] == "PROD-001"
+    assert len(result["suppliers"]) == 2
+    assert {s["supplier_id"] for s in result["suppliers"]} == {"SUP-ACME", "SUP-BETA"}
+
+
 def test_plan_caps_oversized_recommendation_to_storage():
     store.reset_from_seed()
     plan = json.loads(registry.execute_tool("plan_purchase_quantity", {"sku": "PROD-001", "proposed_quantity": 1000}))

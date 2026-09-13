@@ -74,6 +74,26 @@ def get_product(buyer_id: str, sku: str | None = None) -> dict | None:
     return next((p for p in buyer["products"] if p["sku"] == resolved), None)
 
 
+def list_suppliers(product: dict) -> list[dict]:
+    if product.get("suppliers"):
+        return copy.deepcopy(product["suppliers"])
+    terms = product.get("supplier_terms")
+    if terms is None:
+        return []
+    if isinstance(terms, list):
+        return copy.deepcopy(terms)
+    return [copy.deepcopy(terms)]
+
+
+def get_supplier_terms(product: dict, supplier_id: str | None = None) -> dict | None:
+    suppliers = list_suppliers(product)
+    if not suppliers:
+        return None
+    if supplier_id:
+        return next((s for s in suppliers if s.get("supplier_id") == supplier_id), None)
+    return suppliers[0]
+
+
 def list_open_pos(buyer_id: str = DEFAULT_BUYER_ID, sku: str | None = None) -> list[dict]:
     buyer = get_buyer(buyer_id)
     if not buyer:

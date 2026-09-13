@@ -44,14 +44,24 @@
               "supplier_id": "SUP-ACME"
             }
           ],
-          "supplier_terms": {
-            "supplier_id": "SUP-ACME",
-            "sku": "PROD-001",
-            "unit_cost": 10,
-            "lead_time_days": 7,
-            "minimum_order_quantity": 500,
-            "currency": "USD"
-          }
+          "suppliers": [
+            {
+              "supplier_id": "SUP-ACME",
+              "sku": "PROD-001",
+              "unit_cost": 10,
+              "lead_time_days": 7,
+              "minimum_order_quantity": 500,
+              "currency": "USD"
+            },
+            {
+              "supplier_id": "SUP-BETA",
+              "sku": "PROD-001",
+              "unit_cost": 11,
+              "lead_time_days": 5,
+              "minimum_order_quantity": 100,
+              "currency": "USD"
+            }
+          ]
         }
       ]
     }

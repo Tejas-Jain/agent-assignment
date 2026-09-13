@@ -1,6 +1,6 @@
 import uuid
 
-from app.tools import read, store
+from app.tools import store
 
 
 def _require_human_confirmation(human_confirmed: bool, operation: str) -> dict | None:
@@ -15,9 +15,14 @@ def _require_human_confirmation(human_confirmed: bool, operation: str) -> dict |
     return None
 
 
-def _total_cost(sku: str, quantity: int, buyer_id: str = store.DEFAULT_BUYER_ID) -> float:
-    terms = read.get_supplier_terms(sku=sku, buyer_id=buyer_id)
-    if "error" in terms:
+def _total_cost(
+    sku: str, quantity: int, buyer_id: str = store.DEFAULT_BUYER_ID, supplier_id: str | None = None
+) -> float:
+    product = store.get_product(buyer_id, sku)
+    if not product:
+        return 0.0
+    terms = store.get_supplier_terms(product, supplier_id)
+    if not terms:
         return 0.0
     return quantity * terms["unit_cost"]
 
@@ -32,13 +37,15 @@ def _net_requirement_units(buyer_id: str, sku: str) -> int | None:
     return max(0, demand - supply)
 
 
-def _order_quantity_bounds(buyer_id: str, sku: str) -> dict | None:
+def _order_quantity_bounds(buyer_id: str, sku: str, supplier_id: str | None = None) -> dict | None:
     product = store.get_product(buyer_id, sku)
     buyer = store.get_buyer(buyer_id)
     if not product or not buyer:
         return None
+    terms = store.get_supplier_terms(product, supplier_id)
+    if not terms:
+        return None
     inv = product["inventory"]
-    terms = product["supplier_terms"]
     storage = buyer["storage_capacity"]
     budget = buyer["purchasing_budget"]["remaining_amount"]
     unit_cost = terms["unit_cost"]
@@ -47,9 +54,11 @@ def _order_quantity_bounds(buyer_id: str, sku: str) -> dict | None:
     max_by_budget = int(budget // unit_cost) if unit_cost else 0
     max_order = max(0, min(max_by_projected, max_by_slots, max_by_budget))
     return {
+        "supplier_id": terms["supplier_id"],
         "minimum_order_quantity": terms["minimum_order_quantity"],
         "max_order_quantity": max_order,
         "unit_cost": unit_cost,
+        "lead_time_days": terms["lead_time_days"],
     }
 
 
@@ -75,30 +84,60 @@ def _plan_decision(net_requirement: int, proposed_quantity: int | None, moq: int
 
 
 def plan_purchase_quantity(
-    sku: str, proposed_quantity: int | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs
+    sku: str,
+    proposed_quantity: int | None = None,
+    supplier_id: str | None = None,
+    buyer_id: str = store.DEFAULT_BUYER_ID,
+    **_kwargs,
 ) -> dict:
     resolved = store.resolve_sku(buyer_id, sku)
     if not resolved:
         return {"error": f"Unknown SKU {sku}"}
-    net_req = _net_requirement_units(buyer_id, resolved)
-    bounds = _order_quantity_bounds(buyer_id, resolved)
-    if net_req is None or bounds is None:
-        return {"error": f"No planning data for SKU {resolved}"}
     product = store.get_product(buyer_id, resolved)
-    assert product is not None
+    if not product:
+        return {"error": f"No planning data for SKU {resolved}"}
+    net_req = _net_requirement_units(buyer_id, resolved)
+    if net_req is None:
+        return {"error": f"No planning data for SKU {resolved}"}
     inv = product["inventory"]
-    decision, suggested, reject_reason = _plan_decision(
-        net_req, proposed_quantity, bounds["minimum_order_quantity"], bounds["max_order_quantity"]
-    )
+    supplier_ids = [supplier_id] if supplier_id else [s["supplier_id"] for s in store.list_suppliers(product)]
+    if not supplier_ids:
+        return {"error": f"No suppliers configured for SKU {resolved}"}
+
+    options: list[dict] = []
+    for sid in supplier_ids:
+        bounds = _order_quantity_bounds(buyer_id, resolved, sid)
+        if not bounds:
+            continue
+        decision, suggested, reject_reason = _plan_decision(
+            net_req, proposed_quantity, bounds["minimum_order_quantity"], bounds["max_order_quantity"]
+        )
+        options.append(
+            {
+                "supplier_id": sid,
+                "decision": decision,
+                "suggested_quantity": suggested,
+                "reject_reason": reject_reason,
+                "constraints": bounds,
+                "estimated_cost": suggested * bounds["unit_cost"] if suggested else 0,
+            }
+        )
+    if not options:
+        return {"error": f"No supplier terms for SKU {resolved}"}
+
+    viable = [o for o in options if o["decision"] != "reject"]
+    chosen = min(viable, key=lambda o: (o["estimated_cost"], o["constraints"]["minimum_order_quantity"])) if viable else options[0]
     return {
         "sku": resolved,
         "proposed_quantity": proposed_quantity,
         "net_requirement_units": net_req,
         "supply_before_order": {"on_hand_units": inv["on_hand_units"], "inbound_units": inv["inbound_units"]},
-        "constraints": bounds,
-        "decision": decision,
-        "suggested_quantity": suggested,
-        "reject_reason": reject_reason,
+        "recommended_supplier_id": chosen["supplier_id"],
+        "decision": chosen["decision"],
+        "suggested_quantity": chosen["suggested_quantity"],
+        "reject_reason": chosen["reject_reason"],
+        "constraints": chosen["constraints"],
+        "supplier_options": options,
     }
 
 
@@ -115,9 +154,9 @@ def create_purchase_order(
     product = store.get_product(buyer_id, sku)
     if not product:
         return {"error": f"Unknown SKU {sku}"}
-    terms = product["supplier_terms"]
-    if supplier_id and supplier_id != terms["supplier_id"]:
-        return {"error": f"Supplier {supplier_id} not linked to {sku}"}
+    terms = store.get_supplier_terms(product, supplier_id)
+    if not terms:
+        return {"error": f"Supplier {supplier_id or '(default)'} not linked to {sku}"}
     po_id = f"PO-{uuid.uuid4().hex[:6].upper()}"
     po = {"po_id": po_id, "sku": sku, "quantity": quantity, "status": "open", "supplier_id": terms["supplier_id"]}
     store.add_po(buyer_id, sku, po)
@@ -143,14 +182,17 @@ def validate_purchase_order(po_id: str, buyer_id: str = store.DEFAULT_BUYER_ID, 
     product = store.get_product(buyer_id, sku)
     if not product:
         return {"valid": False, "issues": [f"Unknown SKU {sku} for PO"]}
-    terms = product["supplier_terms"]
+    po_supplier_id = po.get("supplier_id")
+    terms = store.get_supplier_terms(product, po_supplier_id)
+    if not terms:
+        return {"valid": False, "issues": [f"Supplier {po_supplier_id} not linked to {sku}"]}
     buyer = store.get_buyer(buyer_id)
     assert buyer is not None
     issues: list[str] = []
     qty = po["quantity"]
     if qty < terms["minimum_order_quantity"]:
-        issues.append(f"Quantity {qty} below MOQ {terms['minimum_order_quantity']}")
-    cost = _total_cost(sku, qty, buyer_id)
+        issues.append(f"Quantity {qty} below MOQ {terms['minimum_order_quantity']} for {terms['supplier_id']}")
+    cost = _total_cost(sku, qty, buyer_id, terms["supplier_id"])
     budget = buyer["purchasing_budget"]["remaining_amount"]
     if cost > budget:
         issues.append(f"Cost {cost} exceeds remaining budget {budget}")
@@ -162,7 +204,7 @@ def validate_purchase_order(po_id: str, buyer_id: str = store.DEFAULT_BUYER_ID, 
     if qty > storage["available_units"]:
         issues.append(f"Order {qty} exceeds available storage slots {storage['available_units']}")
     net_req = _net_requirement_units(buyer_id, sku)
-    bounds = _order_quantity_bounds(buyer_id, sku)
+    bounds = _order_quantity_bounds(buyer_id, sku, terms["supplier_id"])
     suggested_quantity: int | None = None
     if net_req is not None and bounds is not None:
         _, suggested_quantity, _ = _plan_decision(

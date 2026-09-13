@@ -28,8 +28,15 @@ TOOLS: list[ToolDefinition] = [
     ),
     ToolDefinition(
         name="get_supplier_terms",
-        description="Supplier lead time, MOQ, and unit cost for a SKU.",
-        parameters={"type": "object", "properties": {"sku": {"type": "string"}}, "required": []},
+        description="Supplier lead time, MOQ, and unit cost for a SKU. Omit supplier_id to list all suppliers for the SKU.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "sku": {"type": "string"},
+                "supplier_id": {"type": "string", "description": "Optional; returns terms for one supplier."},
+            },
+            "required": [],
+        },
     ),
     ToolDefinition(
         name="get_purchasing_budget",
@@ -55,6 +62,10 @@ TOOLS: list[ToolDefinition] = [
                     "type": "integer",
                     "description": "Quantity from the system recommendation or scenario brief, if given.",
                 },
+                "supplier_id": {
+                    "type": "string",
+                    "description": "Optional; plan using one supplier. If omitted, evaluates all suppliers and picks the best viable option.",
+                },
             },
             "required": ["sku"],
         },
@@ -70,7 +81,7 @@ TOOLS: list[ToolDefinition] = [
             "properties": {
                 "sku": {"type": "string"},
                 "quantity": {"type": "integer"},
-                "supplier_id": {"type": "string"},
+                "supplier_id": {"type": "string", "description": "Supplier to use; default is the first configured supplier for the SKU."},
                 "human_confirmed": {
                     "type": "boolean",
                     "description": "Must be true only after explicit user approval in chat; otherwise the tool rejects.",
