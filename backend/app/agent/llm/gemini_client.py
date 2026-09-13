@@ -1,8 +1,5 @@
 import asyncio
-import base64
 import json
-from collections.abc import AsyncIterator
-from typing import Any
 
 from google import genai
 from google.genai import types
@@ -35,15 +32,14 @@ class GeminiProvider(LLMProvider):
                 if msg.content:
                     parts.append(types.Part(text=msg.content))
                 for tc in msg.tool_calls:
-                    part_kwargs: dict[str, Any] = {
-                        "function_call": types.FunctionCall(
-                            name=tc.name,
-                            args=json.loads(tc.arguments_json or "{}"),
+                    parts.append(
+                        types.Part(
+                            function_call=types.FunctionCall(
+                                name=tc.name,
+                                args=json.loads(tc.arguments_json or "{}"),
+                            )
                         )
-                    }
-                    if tc.thought_signature_b64:
-                        part_kwargs["thought_signature"] = base64.b64decode(tc.thought_signature_b64)
-                    parts.append(types.Part(**part_kwargs))
+                    )
                 if parts:
                     contents.append(types.Content(role="model", parts=parts))
             elif msg.role == "tool":
@@ -85,24 +81,11 @@ class GeminiProvider(LLMProvider):
                 if part.function_call:
                     fc = part.function_call
                     args = dict(fc.args) if fc.args else {}
-                    sig_b64 = base64.b64encode(part.thought_signature).decode("ascii") if part.thought_signature else None
                     tool_calls.append(
                         ToolCall(
                             id=f"call_{fc.name}_{len(tool_calls)}",
                             name=fc.name,
                             arguments_json=json.dumps(args),
-                            thought_signature_b64=sig_b64,
                         )
                     )
         return LLMResponse(content="".join(text_parts) or None, tool_calls=tool_calls)
-
-    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
-        contents = self._to_gemini_contents(request.messages)
-
-        def _call():
-            return self._client.models.generate_content_stream(model=self._model, contents=contents)
-
-        stream = await asyncio.to_thread(_call)
-        for chunk in stream:
-            if chunk.text:
-                yield chunk.text

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -9,16 +8,12 @@ class ToolCall:
     id: str
     name: str
     arguments_json: str
-    thought_signature_b64: str | None = None
 
 
 @dataclass
 class LLMResponse:
     content: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
-
-
-ChatTurn = LLMResponse
 
 
 MessageRole = Literal["system", "user", "assistant", "tool"]
@@ -63,8 +58,4 @@ def append_tool_result(messages: list[Message], tool_call_id: str, name: str, re
 class LLMProvider(ABC):
     @abstractmethod
     async def generate(self, request: LLMRequest) -> LLMResponse:
-        pass
-
-    @abstractmethod
-    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
         pass

@@ -16,7 +16,7 @@ paths:
                 properties:
                   status:
                     type: string
-                  llm_provider:
+                  model:
                     type: string
   /api/chat:
     post:

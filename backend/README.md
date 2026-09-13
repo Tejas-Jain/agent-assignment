@@ -1,6 +1,6 @@
 # AI Purchasing Agent — Backend
 
-Python FastAPI service for the buyer agent (Scenario 1). Streams chat over SSE to the Vite frontend.
+FastAPI service for Scenario 1 (buyer agent). Chat streams over SSE to the optional Vite frontend.
 
 ## Setup
 
@@ -10,7 +10,7 @@ python -m venv .venv
 source .venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt
 cp .env.example .env
-# Set GEMINI_API_KEY or switch LLM_PROVIDER=openai and OPENAI_API_KEY
+# Set GEMINI_API_KEY in .env
 ```
 
 ## Run
@@ -19,16 +19,25 @@ cp .env.example .env
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Frontend: `cd frontend && npm run dev` (proxy `/api` → `:8000`, disable `VITE_MOCK_CHAT`).
+Frontend (optional demo UI): `cd frontend && npm run dev` — proxies `/api` to `:8000`.
 
-## LLM providers
+## What to read first
 
-| `LLM_PROVIDER` | Required env |
-|----------------|--------------|
-| `gemini` (default) | `GEMINI_API_KEY`, optional `GEMINI_MODEL=gemini-2.0-flash` |
-| `openai` | `OPENAI_API_KEY`, optional `OPENAI_BASE_URL`, `OPENAI_MODEL` |
+1. [`app/agent/prompts.py`](app/agent/prompts.py) — agent rules and scenario context  
+2. [`app/agent/runner.py`](app/agent/runner.py) — tool loop, then one final reply over SSE  
+3. [`app/tools/registry.py`](app/tools/registry.py) — tool definitions and dispatch  
+4. [`app/tools/read.py`](app/tools/read.py) / [`app/tools/actions.py`](app/tools/actions.py) — mock ERP behavior  
+5. [`app/data/scenario1.json`](app/data/scenario1.json) — seeded buyer data  
 
-Optional: Gemini via OpenAI-compatible API — `LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/`, key = Gemini API key.
+LLM calls go through [`app/agent/llm/gemini_client.py`](app/agent/llm/gemini_client.py) (`generate` only).
+
+## Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_API_KEY` | Required |
+| `GEMINI_MODEL` | Default `gemini-2.0-flash` |
+| `MAX_TOOL_ITERATIONS` | Cap on tool rounds before error reply (default `10`) |
 
 ## Tests
 
@@ -36,14 +45,14 @@ Optional: Gemini via OpenAI-compatible API — `LLM_PROVIDER=openai`, `OPENAI_BA
 pytest
 ```
 
-Tool/validation tests run without live LLM keys. Chat route test mocks the agent stream.
+Tool/validation tests need no live API key. The chat route test mocks the agent stream.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  ChatAPI["POST /api/chat"] --> Runner[AgentRunner]
-  Runner --> LLM[Gemini or OpenAI]
+  ChatAPI["POST /api/chat"] --> Runner[stream_agent_sse]
+  Runner --> Gemini[GeminiProvider.generate]
   Runner --> Tools[Mock purchasing tools]
   Tools --> Validate[validate_purchase_order]
 ```
@@ -52,5 +61,5 @@ Session state: header `X-Session-Id` (default `default`); mock data from `app/da
 
 ## API docs
 
-- Bruno collection: [`api-collection/`](api-collection/) (`opencollection.yml`, `baseUrl` → `:8000`)
+- Bruno: [`api-collection/`](api-collection/) (`baseUrl` → `:8000`)
 - OpenAPI: [`openapi.yaml`](openapi.yaml)
