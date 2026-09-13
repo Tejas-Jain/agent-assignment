@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.agent.runner import stream_agent_sse
@@ -11,13 +11,12 @@ router = APIRouter()
 
 
 @router.post("/chat")
-async def chat(body: ChatRequest, request: Request, x_session_id: str | None = Header(default=None)):
-    session_id = x_session_id or "default"
+async def chat(body: ChatRequest, request: Request):
     history = [m.model_dump() for m in body.messages]
 
     async def event_stream():
         try:
-            async for chunk in stream_agent_sse(session_id, history, body.message):
+            async for chunk in stream_agent_sse(history, body.message):
                 yield sse_event({"type": "token", "content": chunk})
             yield sse_event({"type": "done"})
         except asyncio.CancelledError:

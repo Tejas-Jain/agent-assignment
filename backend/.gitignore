@@ -22,7 +22,9 @@ dist/
 build/
 *.so
 
-# Logs
+# Live buyer state (seed is app/data/seed/buyers.json)
+app/data/buyers.json
+
 *.log
 
 # OS and editors

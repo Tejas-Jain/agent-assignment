@@ -9,11 +9,13 @@ from app.main import app
 
 @pytest.fixture
 def conversations_tmp(tmp_path, monkeypatch):
-    monkeypatch.setenv("CONVERSATIONS_DIR", str(tmp_path))
+    conv_dir = tmp_path / "conversations"
+    conv_dir.mkdir()
+    monkeypatch.setenv("CONVERSATIONS_DIR", str(conv_dir))
     from app.config import get_settings
 
     get_settings.cache_clear()
-    yield tmp_path
+    yield conv_dir
     get_settings.cache_clear()
 
 

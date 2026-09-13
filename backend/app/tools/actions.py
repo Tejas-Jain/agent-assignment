@@ -3,15 +3,15 @@ import uuid
 from app.tools import read, store
 
 
-def _total_cost(session_id: str, sku: str, quantity: int, buyer_id: str = store.DEFAULT_BUYER_ID) -> float:
-    terms = read.get_supplier_terms(session_id, sku=sku, buyer_id=buyer_id)
+def _total_cost(sku: str, quantity: int, buyer_id: str = store.DEFAULT_BUYER_ID) -> float:
+    terms = read.get_supplier_terms(sku=sku, buyer_id=buyer_id)
     if "error" in terms:
         return 0.0
     return quantity * terms["unit_cost"]
 
 
 def create_purchase_order(
-    session_id: str, sku: str, quantity: int, supplier_id: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs
+    sku: str, quantity: int, supplier_id: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs
 ) -> dict:
     product = store.get_product(buyer_id, sku)
     if not product:
@@ -21,19 +21,19 @@ def create_purchase_order(
         return {"error": f"Supplier {supplier_id} not linked to {sku}"}
     po_id = f"PO-{uuid.uuid4().hex[:6].upper()}"
     po = {"po_id": po_id, "sku": sku, "quantity": quantity, "status": "open", "supplier_id": terms["supplier_id"]}
-    store.add_po(session_id, po)
+    store.add_po(buyer_id, sku, po)
     return {"status": "created", "purchase_order": po}
 
 
-def modify_purchase_order(session_id: str, po_id: str, quantity: int, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
-    if not store.update_po_qty(session_id, po_id, quantity):
+def modify_purchase_order(po_id: str, quantity: int, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+    if not store.update_po_qty(buyer_id, po_id, quantity):
         return {"error": f"PO {po_id} not found"}
-    po = store.get_po(session_id, po_id, buyer_id)
+    po = store.get_po(po_id, buyer_id)
     return {"status": "modified", "purchase_order": po}
 
 
-def validate_purchase_order(session_id: str, po_id: str, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
-    po = store.get_po(session_id, po_id, buyer_id)
+def validate_purchase_order(po_id: str, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+    po = store.get_po(po_id, buyer_id)
     if not po:
         return {"valid": False, "issues": [f"PO {po_id} not found"]}
     sku = po["sku"]
@@ -47,7 +47,7 @@ def validate_purchase_order(session_id: str, po_id: str, buyer_id: str = store.D
     qty = po["quantity"]
     if qty < terms["minimum_order_quantity"]:
         issues.append(f"Quantity {qty} below MOQ {terms['minimum_order_quantity']}")
-    cost = _total_cost(session_id, sku, qty, buyer_id)
+    cost = _total_cost(sku, qty, buyer_id)
     budget = buyer["purchasing_budget"]["remaining_amount"]
     if cost > budget:
         issues.append(f"Cost {cost} exceeds remaining budget {budget}")

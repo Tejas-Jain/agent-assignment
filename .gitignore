@@ -3,7 +3,9 @@
 .env.local
 .env.*.local
 
-# Shared OS / IDE
+# Live buyer state (seed: app/data/seed/buyers.json)
+backend/app/data/buyers.json
+
 .DS_Store
 Thumbs.db
 .idea/

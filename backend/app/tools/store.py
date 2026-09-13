@@ -1,36 +1,56 @@
 import copy
 import json
-from dataclasses import dataclass, field
+import shutil
 from pathlib import Path
 
 DEFAULT_BUYER_ID = "BUYER-01"
 _DEFAULT_SKU = "PROD-001"
 
-_BUYERS_PATH = Path(__file__).resolve().parent.parent / "data" / "buyers.json"
-_BUYERS: list[dict] = json.loads(_BUYERS_PATH.read_text(encoding="utf-8"))["buyers"]
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+SEED_BUYERS_PATH = _DATA_DIR / "seed" / "buyers.json"
+LIVE_BUYERS_PATH = _DATA_DIR / "buyers.json"
+
+_buyers: list[dict] = []
 
 
-@dataclass
-class SessionOverlay:
-    po_qty: dict[str, int] = field(default_factory=dict)
-    added_pos: list[dict] = field(default_factory=list)
+def _read_live_file() -> list[dict]:
+    return json.loads(LIVE_BUYERS_PATH.read_text(encoding="utf-8"))["buyers"]
 
 
-_overlays: dict[str, SessionOverlay] = {}
+def _write_live_file(buyers: list[dict]) -> None:
+    LIVE_BUYERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LIVE_BUYERS_PATH.write_text(json.dumps({"buyers": buyers}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def reset_overlay(session_id: str) -> None:
-    _overlays.pop(session_id, None)
+def ensure_live_from_seed() -> None:
+    if not LIVE_BUYERS_PATH.is_file():
+        LIVE_BUYERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(SEED_BUYERS_PATH, LIVE_BUYERS_PATH)
 
 
-def _overlay(session_id: str) -> SessionOverlay:
-    if session_id not in _overlays:
-        _overlays[session_id] = SessionOverlay()
-    return _overlays[session_id]
+def reload() -> None:
+    global _buyers
+    ensure_live_from_seed()
+    _buyers = _read_live_file()
+
+
+def reset_from_seed() -> None:
+    shutil.copy(SEED_BUYERS_PATH, LIVE_BUYERS_PATH)
+    reload()
+
+
+def persist() -> None:
+    _write_live_file(_buyers)
+
+
+def get_all_buyers() -> list[dict]:
+    if not _buyers:
+        reload()
+    return _buyers
 
 
 def get_buyer(buyer_id: str = DEFAULT_BUYER_ID) -> dict | None:
-    return next((b for b in _BUYERS if b["buyer_id"] == buyer_id), None)
+    return next((b for b in get_all_buyers() if b["buyer_id"] == buyer_id), None)
 
 
 def resolve_sku(buyer_id: str, sku: str | None) -> str | None:
@@ -54,43 +74,50 @@ def get_product(buyer_id: str, sku: str | None = None) -> dict | None:
     return next((p for p in buyer["products"] if p["sku"] == resolved), None)
 
 
-def _seed_pos_for_buyer(buyer_id: str) -> list[dict]:
+def list_open_pos(buyer_id: str = DEFAULT_BUYER_ID, sku: str | None = None) -> list[dict]:
     buyer = get_buyer(buyer_id)
     if not buyer:
         return []
-    pos: list[dict] = []
+    orders: list[dict] = []
     for product in buyer.get("products") or []:
         for po in product.get("open_purchase_orders") or []:
-            pos.append(copy.deepcopy(po))
-    return pos
-
-
-def list_open_pos(session_id: str, buyer_id: str = DEFAULT_BUYER_ID, sku: str | None = None) -> list[dict]:
-    overlay = _overlay(session_id)
-    merged: dict[str, dict] = {}
-    for po in _seed_pos_for_buyer(buyer_id):
-        merged[po["po_id"]] = copy.deepcopy(po)
-    for po in overlay.added_pos:
-        merged[po["po_id"]] = copy.deepcopy(po)
-    for po_id, qty in overlay.po_qty.items():
-        if po_id in merged:
-            merged[po_id]["quantity"] = qty
-    orders = list(merged.values())
+            orders.append(copy.deepcopy(po))
     if sku:
         orders = [o for o in orders if o.get("sku") == sku]
     return orders
 
 
-def get_po(session_id: str, po_id: str, buyer_id: str = DEFAULT_BUYER_ID) -> dict | None:
-    return next((p for p in list_open_pos(session_id, buyer_id) if p["po_id"] == po_id), None)
+def get_po(po_id: str, buyer_id: str = DEFAULT_BUYER_ID) -> dict | None:
+    return next((p for p in list_open_pos(buyer_id) if p["po_id"] == po_id), None)
 
 
-def add_po(session_id: str, po: dict) -> None:
-    _overlay(session_id).added_pos.append(copy.deepcopy(po))
+def _find_po_product(buyer_id: str, po_id: str) -> tuple[dict, dict] | None:
+    buyer = get_buyer(buyer_id)
+    if not buyer:
+        return None
+    for product in buyer.get("products") or []:
+        for po in product.get("open_purchase_orders") or []:
+            if po["po_id"] == po_id:
+                return product, po
+    return None
 
 
-def update_po_qty(session_id: str, po_id: str, quantity: int) -> bool:
-    if get_po(session_id, po_id) is None:
+def add_po(buyer_id: str, sku: str, po: dict) -> None:
+    product = get_product(buyer_id, sku)
+    if not product:
+        raise ValueError(f"Unknown SKU {sku}")
+    product.setdefault("open_purchase_orders", []).append(copy.deepcopy(po))
+    persist()
+
+
+def update_po_qty(buyer_id: str, po_id: str, quantity: int) -> bool:
+    found = _find_po_product(buyer_id, po_id)
+    if not found:
         return False
-    _overlay(session_id).po_qty[po_id] = quantity
+    _, po = found
+    po["quantity"] = quantity
+    persist()
     return True
+
+
+reload()

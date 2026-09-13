@@ -20,7 +20,7 @@ def _build_llm_messages(history: list[dict], message: str) -> list[Message]:
     return msgs
 
 
-async def stream_agent_sse(session_id: str, history: list[dict], message: str) -> AsyncIterator[str]:
+async def stream_agent_sse(history: list[dict], message: str) -> AsyncIterator[str]:
     settings = get_settings()
     llm = GeminiProvider(settings)
     messages = _build_llm_messages(history, message)
@@ -34,7 +34,7 @@ async def stream_agent_sse(session_id: str, history: list[dict], message: str) -
         append_assistant_tool_turn(messages, turn)
         for tc in turn.tool_calls:
             args = json.loads(tc.arguments_json or "{}")
-            result = registry.execute_tool(session_id, tc.name, args)
+            result = registry.execute_tool(tc.name, args)
             append_tool_result(messages, tc.id, tc.name, result)
     else:
         final_text = (

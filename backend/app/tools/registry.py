@@ -83,9 +83,9 @@ HANDLERS: dict[str, ToolHandler] = {
 }
 
 
-def execute_tool(session_id: str, name: str, arguments: dict[str, Any]) -> str:
+def execute_tool(name: str, arguments: dict[str, Any]) -> str:
     handler = HANDLERS.get(name)
     if not handler:
         return json.dumps({"error": f"Unknown tool: {name}"})
-    result = handler(session_id, **arguments)
+    result = handler(**arguments)
     return json.dumps(result)

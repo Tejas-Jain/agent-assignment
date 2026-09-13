@@ -8,7 +8,7 @@ def _sku_or_error(buyer_id: str, sku: str | None) -> tuple[str | None, dict | No
     return resolved, None
 
 
-def get_inventory(session_id: str, sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+def get_inventory(sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
     resolved, err = _sku_or_error(buyer_id, sku)
     if err:
         return err
@@ -18,7 +18,7 @@ def get_inventory(session_id: str, sku: str | None = None, buyer_id: str = store
     return product["inventory"]
 
 
-def get_demand_forecast(session_id: str, sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+def get_demand_forecast(sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
     resolved, err = _sku_or_error(buyer_id, sku)
     if err:
         return err
@@ -28,11 +28,11 @@ def get_demand_forecast(session_id: str, sku: str | None = None, buyer_id: str =
     return product["expected_demand"]
 
 
-def get_open_purchase_orders(session_id: str, sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
-    return {"purchase_orders": store.list_open_pos(session_id, buyer_id, sku)}
+def get_open_purchase_orders(sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+    return {"purchase_orders": store.list_open_pos(buyer_id, sku)}
 
 
-def get_supplier_terms(session_id: str, sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+def get_supplier_terms(sku: str | None = None, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
     resolved, err = _sku_or_error(buyer_id, sku)
     if err:
         return err
@@ -42,14 +42,14 @@ def get_supplier_terms(session_id: str, sku: str | None = None, buyer_id: str = 
     return product["supplier_terms"]
 
 
-def get_purchasing_budget(session_id: str, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+def get_purchasing_budget(buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
     buyer = store.get_buyer(buyer_id)
     if not buyer:
         return {"error": f"Unknown buyer {buyer_id}"}
     return buyer["purchasing_budget"]
 
 
-def get_storage_capacity(session_id: str, buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
+def get_storage_capacity(buyer_id: str = store.DEFAULT_BUYER_ID, **_kwargs) -> dict:
     buyer = store.get_buyer(buyer_id)
     if not buyer:
         return {"error": f"Unknown buyer {buyer_id}"}
