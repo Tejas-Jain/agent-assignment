@@ -1,135 +1,83 @@
 import json
 from typing import Any, Callable
 
+from app.agent.llm.base import ToolDefinition
 from app.tools import actions, read
 
 ToolHandler = Callable[..., dict]
 
-TOOLS: list[dict] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_purchase_recommendation",
-            "description": "Get the pending system purchase recommendation for review.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
+TOOLS: list[ToolDefinition] = [
+    ToolDefinition(
+        name="get_purchase_recommendation",
+        description="Get the pending system purchase recommendation for review.",
+        parameters={"type": "object", "properties": {}, "required": []},
+    ),
+    ToolDefinition(
+        name="get_inventory",
+        description="Get on-hand and inbound inventory for a SKU.",
+        parameters={
+            "type": "object",
+            "properties": {"sku": {"type": "string", "description": "Product SKU"}},
+            "required": [],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_inventory",
-            "description": "Get on-hand and inbound inventory for a SKU.",
-            "parameters": {
-                "type": "object",
-                "properties": {"sku": {"type": "string", "description": "Product SKU"}},
-                "required": [],
+    ),
+    ToolDefinition(
+        name="get_demand_forecast",
+        description="Get demand forecast for a SKU over the planning horizon.",
+        parameters={"type": "object", "properties": {"sku": {"type": "string"}}, "required": []},
+    ),
+    ToolDefinition(
+        name="get_open_purchase_orders",
+        description="List open purchase orders, optionally filtered by SKU.",
+        parameters={"type": "object", "properties": {"sku": {"type": "string"}}, "required": []},
+    ),
+    ToolDefinition(
+        name="get_supplier_terms",
+        description="Supplier lead time, MOQ, and unit cost for a SKU.",
+        parameters={"type": "object", "properties": {"sku": {"type": "string"}}, "required": []},
+    ),
+    ToolDefinition(
+        name="get_purchasing_budget",
+        description="Remaining purchasing budget for the buyer.",
+        parameters={"type": "object", "properties": {}, "required": []},
+    ),
+    ToolDefinition(
+        name="get_storage_capacity",
+        description="Warehouse storage capacity and available space in units.",
+        parameters={"type": "object", "properties": {}, "required": []},
+    ),
+    ToolDefinition(
+        name="create_purchase_order",
+        description="Create a purchase order for a SKU and quantity.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "sku": {"type": "string"},
+                "quantity": {"type": "integer"},
+                "supplier_id": {"type": "string"},
             },
+            "required": ["sku", "quantity"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_demand_forecast",
-            "description": "Get demand forecast for a SKU over the planning horizon.",
-            "parameters": {
-                "type": "object",
-                "properties": {"sku": {"type": "string"}},
-                "required": [],
-            },
+    ),
+    ToolDefinition(
+        name="modify_purchase_order",
+        description="Change quantity on an existing open PO.",
+        parameters={
+            "type": "object",
+            "properties": {"po_id": {"type": "string"}, "quantity": {"type": "integer"}},
+            "required": ["po_id", "quantity"],
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_open_purchase_orders",
-            "description": "List open purchase orders, optionally filtered by SKU.",
-            "parameters": {
-                "type": "object",
-                "properties": {"sku": {"type": "string"}},
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_supplier_terms",
-            "description": "Supplier lead time, MOQ, and unit cost for a SKU.",
-            "parameters": {
-                "type": "object",
-                "properties": {"sku": {"type": "string"}},
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_purchasing_budget",
-            "description": "Remaining purchasing budget for the buyer.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_storage_capacity",
-            "description": "Warehouse storage capacity and available space in units.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_purchase_order",
-            "description": "Create a purchase order for a SKU and quantity.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "sku": {"type": "string"},
-                    "quantity": {"type": "integer"},
-                    "supplier_id": {"type": "string"},
-                },
-                "required": ["sku", "quantity"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "modify_purchase_order",
-            "description": "Change quantity on an existing open PO.",
-            "parameters": {
-                "type": "object",
-                "properties": {"po_id": {"type": "string"}, "quantity": {"type": "integer"}},
-                "required": ["po_id", "quantity"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "reject_purchase_recommendation",
-            "description": "Reject the pending purchase recommendation with a reason.",
-            "parameters": {
-                "type": "object",
-                "properties": {"reason": {"type": "string"}},
-                "required": ["reason"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "validate_purchase_order",
-            "description": "Validate a PO against MOQ, budget, and storage constraints. Call after create/modify.",
-            "parameters": {
-                "type": "object",
-                "properties": {"po_id": {"type": "string"}},
-                "required": ["po_id"],
-            },
-        },
-    },
+    ),
+    ToolDefinition(
+        name="reject_purchase_recommendation",
+        description="Reject the pending purchase recommendation with a reason.",
+        parameters={"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]},
+    ),
+    ToolDefinition(
+        name="validate_purchase_order",
+        description="Validate a PO against MOQ, budget, and storage constraints. Call after create/modify.",
+        parameters={"type": "object", "properties": {"po_id": {"type": "string"}}, "required": ["po_id"]},
+    ),
 ]
 
 HANDLERS: dict[str, ToolHandler] = {

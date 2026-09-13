@@ -1,57 +1,60 @@
 import asyncio
 import base64
 import json
+from collections.abc import AsyncIterator
 from typing import Any
 
 from google import genai
 from google.genai import types
 
-from app.agent.llm.base import ChatTurn, ToolCall
-from app.agent.llm.schema_map import openai_tools_to_gemini_declarations
+from app.agent.llm.base import LLMProvider, LLMRequest, LLMResponse, Message, ToolCall, ToolDefinition
 from app.config import Settings
 
 
-class GeminiClient:
+class GeminiProvider(LLMProvider):
     def __init__(self, settings: Settings):
         self._client = genai.Client(api_key=settings.gemini_api_key)
         self._model = settings.gemini_model
 
-    def _to_gemini_contents(self, messages: list[dict]) -> list[types.Content]:
+    def _to_gemini_declarations(self, tools: list[ToolDefinition]) -> list[dict]:
+        return [
+            {"name": t.name, "description": t.description, "parameters": t.parameters or {"type": "object", "properties": {}}}
+            for t in tools
+        ]
+
+    def _to_gemini_contents(self, messages: list[Message]) -> list[types.Content]:
         contents: list[types.Content] = []
         for msg in messages:
-            role = msg["role"]
-            if role == "system":
-                contents.append(types.Content(role="user", parts=[types.Part(text=f"[System]\n{msg['content']}")]))
+            if msg.role == "system":
+                contents.append(types.Content(role="user", parts=[types.Part(text=f"[System]\n{msg.content}")]))
                 contents.append(types.Content(role="model", parts=[types.Part(text="Understood.")]))
-            elif role == "user":
-                contents.append(types.Content(role="user", parts=[types.Part(text=msg["content"] or "")]))
-            elif role == "assistant":
+            elif msg.role == "user":
+                contents.append(types.Content(role="user", parts=[types.Part(text=msg.content or "")]))
+            elif msg.role == "assistant":
                 parts: list[types.Part] = []
-                if msg.get("content"):
-                    parts.append(types.Part(text=msg["content"]))
-                for tc in msg.get("tool_calls") or []:
-                    fn = tc["function"]
+                if msg.content:
+                    parts.append(types.Part(text=msg.content))
+                for tc in msg.tool_calls:
                     part_kwargs: dict[str, Any] = {
                         "function_call": types.FunctionCall(
-                            name=fn["name"],
-                            args=json.loads(fn.get("arguments") or "{}"),
+                            name=tc.name,
+                            args=json.loads(tc.arguments_json or "{}"),
                         )
                     }
-                    sig_b64 = tc.get("thought_signature_b64")
-                    if sig_b64:
-                        part_kwargs["thought_signature"] = base64.b64decode(sig_b64)
+                    if tc.thought_signature_b64:
+                        part_kwargs["thought_signature"] = base64.b64decode(tc.thought_signature_b64)
                     parts.append(types.Part(**part_kwargs))
                 if parts:
                     contents.append(types.Content(role="model", parts=parts))
-            elif role == "tool":
+            elif msg.role == "tool":
                 contents.append(
                     types.Content(
                         role="user",
                         parts=[
                             types.Part(
                                 function_response=types.FunctionResponse(
-                                    name=msg.get("name") or "tool",
-                                    response={"result": json.loads(msg["content"]) if msg.get("content") else {}},
+                                    name=msg.name or "tool",
+                                    response={"result": json.loads(msg.content) if msg.content else {}},
                                 )
                             )
                         ],
@@ -59,16 +62,17 @@ class GeminiClient:
                 )
         return contents
 
-    async def chat_with_tools(self, messages: list[dict], tools: list[dict]) -> ChatTurn:
-        declarations = openai_tools_to_gemini_declarations(tools)
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        declarations = self._to_gemini_declarations(request.tools)
         tool_config = types.Tool(function_declarations=[types.FunctionDeclaration(**d) for d in declarations])
-        contents = self._to_gemini_contents(messages)
+        contents = self._to_gemini_contents(request.messages)
+        config = types.GenerateContentConfig(tools=[tool_config]) if declarations else None
 
         def _call():
             return self._client.models.generate_content(
                 model=self._model,
                 contents=contents,
-                config=types.GenerateContentConfig(tools=[tool_config]),
+                config=config,
             )
 
         response = await asyncio.to_thread(_call)
@@ -90,10 +94,10 @@ class GeminiClient:
                             thought_signature_b64=sig_b64,
                         )
                     )
-        return ChatTurn(content="".join(text_parts) or None, tool_calls=tool_calls)
+        return LLMResponse(content="".join(text_parts) or None, tool_calls=tool_calls)
 
-    async def stream_chat(self, messages: list[dict]):
-        contents = self._to_gemini_contents(messages)
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        contents = self._to_gemini_contents(request.messages)
 
         def _call():
             return self._client.models.generate_content_stream(model=self._model, contents=contents)
@@ -102,23 +106,3 @@ class GeminiClient:
         for chunk in stream:
             if chunk.text:
                 yield chunk.text
-
-    def append_assistant_tool_turn(self, messages: list[dict], turn: ChatTurn) -> None:
-        messages.append(
-            {
-                "role": "assistant",
-                "content": turn.content,
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {"name": tc.name, "arguments": tc.arguments_json},
-                        **({"thought_signature_b64": tc.thought_signature_b64} if tc.thought_signature_b64 else {}),
-                    }
-                    for tc in turn.tool_calls
-                ],
-            }
-        )
-
-    def append_tool_result(self, messages: list[dict], tool_call_id: str, name: str, result: str) -> None:
-        messages.append({"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": result})

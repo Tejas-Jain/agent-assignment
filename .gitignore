@@ -10,4 +10,3 @@ Thumbs.db
 
 # Local Cursor scratch (plans under .cursor/plans may stay tracked)
 .cursor/**/*.tmp
-.cursor/*
