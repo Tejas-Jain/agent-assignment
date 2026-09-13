@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import chat, health
+from app.api import chat, conversations, health
 from app.config import get_settings, validate_settings
 
 
@@ -15,3 +15,4 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="AI Purchasing Agent", lifespan=lifespan)
 app.include_router(health.router)
 app.include_router(chat.router, prefix="/api")
+app.include_router(conversations.router, prefix="/api")

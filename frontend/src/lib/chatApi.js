@@ -25,3 +25,25 @@ export async function postChatStream({ messages, message, signal, onEvent }) {
   if (!res.ok) throw new Error(await res.text().catch(() => res.statusText))
   await parseSseStream(res, onEvent)
 }
+
+export async function fetchPastConversations() {
+  const res = await fetch(`${base}/api/conversations`)
+  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText))
+  return res.json()
+}
+
+export async function fetchPastConversation(id) {
+  const res = await fetch(`${base}/api/conversations/${encodeURIComponent(id)}`)
+  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText))
+  return res.json()
+}
+
+export async function savePastConversation(messages) {
+  const res = await fetch(`${base}/api/conversations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+  })
+  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText))
+  return res.json()
+}

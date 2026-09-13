@@ -47,3 +47,95 @@ paths:
               schema:
                 type: string
                 description: 'SSE frames data: {"type":"token"|"done"|"error", ...}'
+  /api/conversations:
+    get:
+      summary: List past conversations (read-only archives)
+      responses:
+        "200":
+          description: Summaries newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    title:
+                      type: string
+                    created_at:
+                      type: string
+    post:
+      summary: Save a completed conversation transcript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - messages
+              properties:
+                messages:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        type: string
+      responses:
+        "201":
+          description: Saved archive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  created_at:
+                    type: string
+                  messages:
+                    type: array
+                    items:
+                      type: object
+  /api/conversations/{conversation_id}:
+    get:
+      summary: Get a past conversation by id
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full archived transcript
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  created_at:
+                    type: string
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        role:
+                          type: string
+                        content:
+                          type: string
+        "404":
+          description: Not found

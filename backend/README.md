@@ -59,6 +59,8 @@ flowchart LR
 
 Session state: header `X-Session-Id` (default `default`); mock data from `app/data/scenario1.json`.
 
+Past chats are saved when you click **New chat** in the UI (`POST /api/conversations` with the full transcript). Files live under `app/data/conversations/` (override with `CONVERSATIONS_DIR`). List/get via `GET /api/conversations` and `GET /api/conversations/{id}` — read-only, not resumed in the agent loop.
+
 ## API docs
 
 - Bruno: [`api-collection/`](api-collection/) (`baseUrl` → `:8000`)

@@ -1,0 +1,20 @@
+meta {
+  name: Save past conversation
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/conversations
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "messages": [
+      { "role": "user", "content": "Review the 800 unit recommendation" },
+      { "role": "assistant", "content": "Decision: investigate further." }
+    ]
+  }
+}

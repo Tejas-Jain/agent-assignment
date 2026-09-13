@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
     max_tool_iterations: int = 10
+    conversations_dir: str = ""
 
     def validate_provider(self) -> None:
         if not self.gemini_api_key.strip():

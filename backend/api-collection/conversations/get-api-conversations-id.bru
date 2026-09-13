@@ -1,0 +1,15 @@
+meta {
+  name: Get past conversation
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/conversations/{{conversationId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  conversationId: 20260101T120000Z_abc12345
+}
