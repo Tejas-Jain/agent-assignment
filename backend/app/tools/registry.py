@@ -42,30 +42,68 @@ TOOLS: list[ToolDefinition] = [
         parameters={"type": "object", "properties": {}, "required": []},
     ),
     ToolDefinition(
+        name="plan_purchase_quantity",
+        description=(
+            "Compute net demand gap and a feasible order quantity (MOQ, budget, storage). "
+            "Call when reviewing a purchase recommendation; prefer modify over reject when suggested_quantity > 0."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "sku": {"type": "string"},
+                "proposed_quantity": {
+                    "type": "integer",
+                    "description": "Quantity from the system recommendation or scenario brief, if given.",
+                },
+            },
+            "required": ["sku"],
+        },
+    ),
+    ToolDefinition(
         name="create_purchase_order",
-        description="Create a purchase order for a SKU and quantity.",
+        description=(
+            "Create a purchase order for a SKU and quantity. HIGH-STAKES: do not call until the human "
+            "reviewer explicitly confirms in chat; then set human_confirmed=true."
+        ),
         parameters={
             "type": "object",
             "properties": {
                 "sku": {"type": "string"},
                 "quantity": {"type": "integer"},
                 "supplier_id": {"type": "string"},
+                "human_confirmed": {
+                    "type": "boolean",
+                    "description": "Must be true only after explicit user approval in chat; otherwise the tool rejects.",
+                },
             },
-            "required": ["sku", "quantity"],
+            "required": ["sku", "quantity", "human_confirmed"],
         },
     ),
     ToolDefinition(
         name="modify_purchase_order",
-        description="Change quantity on an existing open PO.",
+        description=(
+            "Change quantity on an existing open PO. HIGH-STAKES: do not call until the human reviewer "
+            "explicitly confirms in chat; then set human_confirmed=true."
+        ),
         parameters={
             "type": "object",
-            "properties": {"po_id": {"type": "string"}, "quantity": {"type": "integer"}},
-            "required": ["po_id", "quantity"],
+            "properties": {
+                "po_id": {"type": "string"},
+                "quantity": {"type": "integer"},
+                "human_confirmed": {
+                    "type": "boolean",
+                    "description": "Must be true only after explicit user approval in chat; otherwise the tool rejects.",
+                },
+            },
+            "required": ["po_id", "quantity", "human_confirmed"],
         },
     ),
     ToolDefinition(
         name="validate_purchase_order",
-        description="Validate a PO against MOQ, budget, and storage constraints. Call after create/modify.",
+        description=(
+            "Validate a PO against MOQ, budget, and storage. Call after create/modify. "
+            "If invalid, use suggested_quantity in the response and adjust the PO—do not reject the purchase outright."
+        ),
         parameters={"type": "object", "properties": {"po_id": {"type": "string"}}, "required": ["po_id"]},
     ),
 ]
@@ -77,6 +115,7 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_supplier_terms": read.get_supplier_terms,
     "get_purchasing_budget": read.get_purchasing_budget,
     "get_storage_capacity": read.get_storage_capacity,
+    "plan_purchase_quantity": actions.plan_purchase_quantity,
     "create_purchase_order": actions.create_purchase_order,
     "modify_purchase_order": actions.modify_purchase_order,
     "validate_purchase_order": actions.validate_purchase_order,

@@ -35,6 +35,13 @@
               "quantity": 100,
               "status": "open",
               "supplier_id": "SUP-ACME"
+            },
+            {
+              "po_id": "PO-E854A3",
+              "sku": "PROD-001",
+              "quantity": 500,
+              "status": "open",
+              "supplier_id": "SUP-ACME"
             }
           ],
           "supplier_terms": {
