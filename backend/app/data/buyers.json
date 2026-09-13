@@ -37,11 +37,18 @@
               "supplier_id": "SUP-ACME"
             },
             {
-              "po_id": "PO-2EB49F",
+              "po_id": "PO-57222E",
               "sku": "PROD-001",
-              "quantity": 300,
+              "quantity": 500,
               "status": "open",
               "supplier_id": "SUP-ACME"
+            },
+            {
+              "po_id": "PO-1CD6E1",
+              "sku": "PROD-001",
+              "quantity": 100,
+              "status": "open",
+              "supplier_id": "SUP-BETA"
             }
           ],
           "suppliers": [
