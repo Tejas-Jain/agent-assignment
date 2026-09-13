@@ -1,3 +1,9 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
 # Logs
 logs
 *.log
@@ -7,6 +13,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Build
 node_modules
 dist
 dist-ssr
@@ -17,6 +24,7 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj

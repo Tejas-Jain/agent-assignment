@@ -1,0 +1,13 @@
+# Root-level env (optional monorepo secrets)
+.env
+.env.local
+.env.*.local
+
+# Shared OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+
+# Local Cursor scratch (plans under .cursor/plans may stay tracked)
+.cursor/**/*.tmp
+.cursor/*
