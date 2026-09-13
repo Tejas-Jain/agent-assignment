@@ -85,6 +85,36 @@
   word-break: break-word;
 }
 
+.chat__markdown {
+  white-space: normal;
+}
+
+.chat__markdown > :first-child {
+  margin-top: 0;
+}
+
+.chat__markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.chat__markdown p {
+  margin: 0.5em 0;
+}
+
+.chat__markdown ul,
+.chat__markdown ol {
+  margin: 0.5em 0;
+  padding-left: 1.25rem;
+}
+
+.chat__markdown li {
+  margin: 0.25em 0;
+}
+
+.chat__markdown strong {
+  font-weight: 600;
+}
+
 .chat__composer {
   flex-shrink: 0;
   display: flex;

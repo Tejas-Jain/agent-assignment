@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { postChatStream } from '../lib/chatApi.js'
 
 let nextId = 0
@@ -93,7 +95,17 @@ export default function ChatWindow() {
         {messages.map((m) => (
           <div key={m.id} className={`chat__bubble chat__bubble--${m.role}${m.status === 'streaming' ? ' chat__bubble--streaming' : ''}${m.status === 'error' ? ' chat__bubble--error' : ''}`}>
             <span className="chat__role">{m.role === 'user' ? 'You' : 'Assistant'}</span>
-            <p className="chat__text">{m.content || (m.status === 'streaming' ? '…' : '')}</p>
+            {m.role === 'assistant' ? (
+              <div className="chat__text chat__markdown">
+                {m.content ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                ) : (
+                  m.status === 'streaming' ? '…' : ''
+                )}
+              </div>
+            ) : (
+              <p className="chat__text">{m.content}</p>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
