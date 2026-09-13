@@ -20,13 +20,13 @@ def conversations_tmp(tmp_path, monkeypatch):
 def test_save_and_list_conversations(conversations_tmp):
     store.save_conversation(
         [
-            {"role": "user", "content": "Review the 800 unit recommendation"},
+            {"role": "user", "content": "Review the 1000 unit recommendation"},
             {"role": "assistant", "content": "Decision: investigate further."},
         ]
     )
     items = store.list_conversations()
     assert len(items) == 1
-    assert "800" in items[0].title
+    assert "1000" in items[0].title
     full = store.get_conversation(items[0].id)
     assert full is not None
     assert len(full.messages) == 2

@@ -8,11 +8,6 @@ ToolHandler = Callable[..., dict]
 
 TOOLS: list[ToolDefinition] = [
     ToolDefinition(
-        name="get_purchase_recommendation",
-        description="Get the pending system purchase recommendation for review.",
-        parameters={"type": "object", "properties": {}, "required": []},
-    ),
-    ToolDefinition(
         name="get_inventory",
         description="Get on-hand and inbound inventory for a SKU.",
         parameters={
@@ -69,11 +64,6 @@ TOOLS: list[ToolDefinition] = [
         },
     ),
     ToolDefinition(
-        name="reject_purchase_recommendation",
-        description="Reject the pending purchase recommendation with a reason.",
-        parameters={"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]},
-    ),
-    ToolDefinition(
         name="validate_purchase_order",
         description="Validate a PO against MOQ, budget, and storage constraints. Call after create/modify.",
         parameters={"type": "object", "properties": {"po_id": {"type": "string"}}, "required": ["po_id"]},
@@ -81,7 +71,6 @@ TOOLS: list[ToolDefinition] = [
 ]
 
 HANDLERS: dict[str, ToolHandler] = {
-    "get_purchase_recommendation": read.get_purchase_recommendation,
     "get_inventory": read.get_inventory,
     "get_demand_forecast": read.get_demand_forecast,
     "get_open_purchase_orders": read.get_open_purchase_orders,
@@ -90,7 +79,6 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_storage_capacity": read.get_storage_capacity,
     "create_purchase_order": actions.create_purchase_order,
     "modify_purchase_order": actions.modify_purchase_order,
-    "reject_purchase_recommendation": actions.reject_purchase_recommendation,
     "validate_purchase_order": actions.validate_purchase_order,
 }
 

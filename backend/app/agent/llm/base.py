@@ -8,6 +8,7 @@ class ToolCall:
     id: str
     name: str
     arguments_json: str
+    thought_signature_b64: str | None = None
 
 
 @dataclass

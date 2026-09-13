@@ -26,7 +26,7 @@ async def test_chat_sse_done_event():
             async with client.stream(
                 "POST",
                 "/api/chat",
-                json={"message": "Review the 800 unit recommendation", "messages": []},
+                json={"message": "Review the 1000 unit recommendation", "messages": []},
                 headers={"Accept": "text/event-stream"},
             ) as resp:
                 assert resp.status_code == 200

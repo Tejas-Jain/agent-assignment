@@ -1,0 +1,52 @@
+{
+  "buyers": [
+    {
+      "buyer_id": "BUYER-01",
+      "purchasing_budget": {
+        "buyer_id": "BUYER-01",
+        "remaining_amount": 10000,
+        "currency": "USD"
+      },
+      "storage_capacity": {
+        "node_id": "FC-NORTH-01",
+        "max_units": 1000,
+        "used_units": 400,
+        "available_units": 600
+      },
+      "products": [
+        {
+          "sku": "PROD-001",
+          "inventory": {
+            "sku": "PROD-001",
+            "on_hand_units": 100,
+            "inbound_units": 100,
+            "node_id": "FC-NORTH-01"
+          },
+          "expected_demand": {
+            "sku": "PROD-001",
+            "horizon_weeks": 4,
+            "expected_units": 1000,
+            "notes": "Steady demand aligned with planning horizon"
+          },
+          "open_purchase_orders": [
+            {
+              "po_id": "PO-1000",
+              "sku": "PROD-001",
+              "quantity": 100,
+              "status": "open",
+              "supplier_id": "SUP-ACME"
+            }
+          ],
+          "supplier_terms": {
+            "supplier_id": "SUP-ACME",
+            "sku": "PROD-001",
+            "unit_cost": 10,
+            "lead_time_days": 7,
+            "minimum_order_quantity": 500,
+            "currency": "USD"
+          }
+        }
+      ]
+    }
+  ]
+}
