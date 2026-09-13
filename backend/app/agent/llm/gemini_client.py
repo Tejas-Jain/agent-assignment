@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 from typing import Any
 
@@ -30,14 +31,16 @@ class GeminiClient:
                     parts.append(types.Part(text=msg["content"]))
                 for tc in msg.get("tool_calls") or []:
                     fn = tc["function"]
-                    parts.append(
-                        types.Part(
-                            function_call=types.FunctionCall(
-                                name=fn["name"],
-                                args=json.loads(fn.get("arguments") or "{}"),
-                            )
+                    part_kwargs: dict[str, Any] = {
+                        "function_call": types.FunctionCall(
+                            name=fn["name"],
+                            args=json.loads(fn.get("arguments") or "{}"),
                         )
-                    )
+                    }
+                    sig_b64 = tc.get("thought_signature_b64")
+                    if sig_b64:
+                        part_kwargs["thought_signature"] = base64.b64decode(sig_b64)
+                    parts.append(types.Part(**part_kwargs))
                 if parts:
                     contents.append(types.Content(role="model", parts=parts))
             elif role == "tool":
@@ -78,11 +81,13 @@ class GeminiClient:
                 if part.function_call:
                     fc = part.function_call
                     args = dict(fc.args) if fc.args else {}
+                    sig_b64 = base64.b64encode(part.thought_signature).decode("ascii") if part.thought_signature else None
                     tool_calls.append(
                         ToolCall(
                             id=f"call_{fc.name}_{len(tool_calls)}",
                             name=fc.name,
                             arguments_json=json.dumps(args),
+                            thought_signature_b64=sig_b64,
                         )
                     )
         return ChatTurn(content="".join(text_parts) or None, tool_calls=tool_calls)
@@ -104,7 +109,12 @@ class GeminiClient:
                 "role": "assistant",
                 "content": turn.content,
                 "tool_calls": [
-                    {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": tc.arguments_json}}
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.name, "arguments": tc.arguments_json},
+                        **({"thought_signature_b64": tc.thought_signature_b64} if tc.thought_signature_b64 else {}),
+                    }
                     for tc in turn.tool_calls
                 ],
             }
